@@ -1,0 +1,132 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum VoteType {
+  UP
+  DOWN
+}
+
+model User {
+  id                String         @id @unique @default(cuid())
+  name              String?
+  email             String?        @unique
+  emailVerified     DateTime?
+  username          String?        @unique
+  image             String?
+  createdSubreddits Subreddit[]    @relation("CreatedBy")
+  votes             Vote[]
+  subscriptions     Subscription[]
+  sessions          Session[]
+  account           Account[]
+  post              Post[]
+  comment           Comment[]
+  commentVote       CommentVote[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String  @unique
+  providerAccountId String  @unique
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expired_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id])
+  // @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id            String   @id @default(cuid())
+  session_token String   @unique
+  userId        String
+  expires       DateTime
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Subreddit {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  posts       Post[]
+  creatorId   String?
+  Creator     User?          @relation("CreatedBy", fields: [creatorId], references: [id])
+  subscribers Subscription[]
+  // @@index([name])
+}
+
+model Subscription {
+  userId      String
+  subredditId String
+  user        User      @relation(fields: [userId], references: [id])
+  subReddit   Subreddit @relation(fields: [subredditId], references: [id], onDelete: Cascade)
+
+  @@id([userId, subredditId])
+} 
+
+model Post {
+  id          String   @id @default(cuid())
+  title       String
+  content     Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  authorId    String
+  subredditId String
+
+  author    User      @relation(fields: [authorId], references: [id])
+  subreddit Subreddit @relation(fields: [subredditId], references: [id], onDelete: Cascade)
+  comments  Comment[]
+  votes     Vote[]
+}
+
+model Comment {
+  id        String        @id @default(cuid())
+  text      String
+  createdAt DateTime      @default(now())
+  author    String
+  postId    String
+  replyToId String?
+  commentId String?
+  votes     CommentVote[]
+
+  user    User      @relation(fields: [author], references: [id])
+  post    Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  replyTo Comment?  @relation("ReplyTo", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies Comment[] @relation("ReplyTo")
+  // Vote    Vote[]
+}
+
+model Vote {
+  userId String
+  postId String
+  user   User     @relation(fields: [userId], references: [id])
+  type   VoteType
+  Post   Post     @relation(fields: [postId], references: [id])
+
+  @@id([userId, postId])
+}
+
+model CommentVote {
+  userId    String
+  commentId String
+  comment   Comment  @relation(fields: [commentId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  type      VoteType
+
+  @@id([userId, commentId])
+}
